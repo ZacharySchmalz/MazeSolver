@@ -36,7 +36,8 @@ class Maze
 		Node *end;												// end node
 		int nodeCount;											// total # of nodes created in the maze
 		int nodesVisited;										// total # of nodes visited by a searching algorithm
-		int pathLength;											// total # of nodes that make up the maze's solution
+		int pathNodeLength;										// total # of nodes that make up the maze solution
+		int pathPixelLength;									// total # of pixels that make up the maze solution	
 		int width;												// image height(pixels)
 		int height;												// image width(pixels)
 		double time;											// timing the lengths of operations

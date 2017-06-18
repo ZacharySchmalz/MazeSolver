@@ -6,6 +6,7 @@
 #include <thread>		// mainly used by the "computing" function
 #include <iomanip>		// increase timing precision
 #include <stack>		// used for stack-implemented searching algorithms
+#include <cmath>
 #include "Maze.h"		// function declarations
 
 typedef std::chrono::high_resolution_clock Clock;
@@ -62,7 +63,7 @@ void Maze::solve(int algorithm, std::string solutionName)
 			operation_t1.join();
 			info_t1.join();
 			std::cout << "\rNodes Visited\t\t\t" << nodesVisited << " nodes" << std::endl;
-			std::cout << "Path Length\t\t\t" << pathLength << " nodes" << std::endl;
+			std::cout << "Path Length\t\t\t" << pathNodeLength << " nodes | " << pathPixelLength << " pixels" << std::endl;
 			std::cout << "\rPath Found\t\t\t" << std::setprecision(9) << time << " seconds\n" << std::endl;
 			break;
 	}
@@ -127,11 +128,43 @@ void Maze::allocateNodes()
 		{
 			if (mazeImage(x, y, 0, 0) == 255)
 			{
-				mazeVector[y][x] = new Node;
-				nodeCount++;
+				int directions = 0;
+				bool north = false, east = false, south = false, west = false;
+
+				// Check north
+				if (y-1 >= 0 && mazeImage(x, y - 1, 0, 0) == 255)
+				{
+					directions++;
+					north = true;
+				}
+				// Check east
+				if (x+1 < width && mazeImage(x + 1, y, 0, 0) == 255)
+				{
+					directions++;
+					east = true;
+				}
+				// Check south
+				if (y+1 <= height && mazeImage(x, y + 1, 0, 0) == 255)
+				{
+					directions++;
+					south = true;
+				}
+				// Check west
+				if (x-1 > 0 && mazeImage(x - 1, y, 0, 0) == 255)
+				{
+					directions++;
+					west = true;
+				}
+
+				if (directions >= 2 && ((north == false && south == true) || (north == true && south == false) || (east == true && west == false) || (east == false && west == true || (north == true && east == true && south == true && west == true))))
+				{
+					mazeVector[y][x] = new Node;
+					nodeCount++;
+				}
+				else
+					mazeVector[y][x] = NULL;
 			}
-			//else
-			//	mazeVector[y][x] = NULL;
+			
 		}
 	}
 	isOperationComplete = true;
@@ -144,27 +177,68 @@ void Maze::assignNodeData()
 	{
 		for (int x = 0; x < mazeVector[y].size(); x++)
 		{
-			if (mazeImage(x, y, 0, 0) == 255)
+			if (mazeVector[y][x] != NULL)
 			{
 				// Set node location
 				mazeVector[y][x]->posX = x;
 				mazeVector[y][x]->posY = y;
 
 				// Check north pixel for a path
-				if (y - 1 >= 0 && mazeImage(x, y - 1, 0, 0) == 255)
-					mazeVector[y][x]->neighbors.push_back(mazeVector[y - 1][x]);
+				//if (y - 1 >= 0 && mazeImage(x, y - 1, 0, 0) == 255)
+					//mazeVector[y][x]->neighbors.push_back(mazeVector[y - 1][x]);
+				int range = y - 1;
+				while (range >= 0 && mazeImage(x, range, 0, 0) == 255)
+				{
+					if (mazeVector[range][x] != NULL)
+					{
+						mazeVector[y][x]->neighbors.push_back(mazeVector[range][x]);
+						break;
+					}
+					else
+						range--;
+				}
 
 				// Check east pixel for a path
-				if (x + 1 < width && mazeImage(x + 1, y, 0, 0) == 255)
-					mazeVector[y][x]->neighbors.push_back(mazeVector[y][x + 1]);
+				//if (x + 1 < width && mazeImage(x + 1, y, 0, 0) == 255)
+					//mazeVector[y][x]->neighbors.push_back(mazeVector[y][x + 1]);
+				range = x + 1;
+				while (range < width && mazeImage(range, y, 0, 0) == 255)
+				{
+					if (mazeVector[y][range] != NULL)
+					{
+						mazeVector[y][x]->neighbors.push_back(mazeVector[y][range]);
+						break;
+					}
+					else
+						range++;
+				}
 
-				// Check south pixel for a path
-				if (y + 1 < height && mazeImage(x, y + 1, 0, 0) == 255)
-					mazeVector[y][x]->neighbors.push_back(mazeVector[y + 1][x]);
+				range = y + 1;
+				while (range < height && mazeImage(x, range, 0, 0) == 255)
+				{
+					if (mazeVector[range][x] != NULL)
+					{
+						mazeVector[y][x]->neighbors.push_back(mazeVector[range][x]);
+						break;
+					}
+					else
+						range++;
+				}
 
 				// Check west pixel for a path
-				if (x - 1 > 0 && mazeImage(x - 1, y, 0, 0) == 255)
-					mazeVector[y][x]->neighbors.push_back(mazeVector[y][x - 1]);
+				//if (x - 1 > 0 && mazeImage(x - 1, y, 0, 0) == 255)
+					//mazeVector[y][x]->neighbors.push_back(mazeVector[y][x - 1]);
+				range = x - 1;
+				while (range > 0 && mazeImage(range, y, 0, 0) == 255)
+				{
+					if (mazeVector[y][range] != NULL)
+					{
+						mazeVector[y][x]->neighbors.push_back(mazeVector[y][range]);
+						break;
+					}
+					else
+						range--;
+				}
 			}
 		}
 	}
@@ -178,14 +252,76 @@ void Maze::imageSave(std::string solutionName)
 
 	// Interpolate the path color from blue to red
 	int r = 0;
-	for (int i = 0; i < pathLength; i++)
+	int i = 0;
+	Node *t = end;
+	// Trace path backwards from the end
+	while(t->parent != NULL)
 	{
-		r = int((i * 255) / pathLength);
-		mazeImage(end->posX, end->posY, 0, 0) = 255 - r;
-		mazeImage(end->posX, end->posY, 0, 1) = 0;
-		mazeImage(end->posX, end->posY, 0, 2) = r;
-		end = end->parent;
+		// Parent node lies on the X axis of mazeVector
+		if (t->posX - t->parent->posX != 0)
+		{
+			int xDif = t->posX - t->parent->posX;
+			// Parent node is west
+			if (xDif > 0)
+			{
+				for (int j = 0; j < xDif; j++)
+				{
+					r = int((i * 255) / pathPixelLength);
+					mazeImage(t->posX-j, t->posY, 0, 0) = 255 - r;
+					mazeImage(t->posX-j, t->posY, 0, 1) = 0;
+					mazeImage(t->posX-j, t->posY, 0, 2) = r;
+					i++;
+				}
+			}
+			// Parent node is east
+			else
+			{
+				for (int j = 0; j < abs(xDif); j++)
+				{
+					r = int((i * 255) / pathPixelLength);
+					mazeImage(t->posX+j, t->posY, 0, 0) = 255 - r;
+					mazeImage(t->posX+j, t->posY, 0, 1) = 0;
+					mazeImage(t->posX+j, t->posY, 0, 2) = r;
+					i++;
+				}
+			}
+		}
+		// Parent node lies on the Y axis of mazeVector
+		else
+		{
+			int yDif = t->posY - t->parent->posY;
+			// Parent node is north
+			if (yDif > 0)
+			{
+				for (int j = 0; j < yDif; j++)
+				{
+					r = int((i * 255) / pathPixelLength);
+					mazeImage(t->posX, t->posY-j, 0, 0) = 255 - r;
+					mazeImage(t->posX, t->posY-j, 0, 1) = 0;
+					mazeImage(t->posX, t->posY-j, 0, 2) = r;
+					i++;
+				}
+			}
+			// Parent node is north
+			else
+			{
+				for (int j = 0; j < abs(yDif); j++)
+				{
+					r = int((i * 255) / pathPixelLength);
+					mazeImage(t->posX, t->posY+j, 0, 0) = 255 - r;
+					mazeImage(t->posX, t->posY+j, 0, 1) = 0;
+					mazeImage(t->posX, t->posY+j, 0, 2) = r;
+					i++;
+				}
+			}
+		}
+		t = t->parent;
 	}
+
+	// Since start node does not have parent, manually color. Will be solid blue
+	mazeImage(start->posX, start->posY, 0, 0) = 0;
+	mazeImage(start->posX, start->posY, 0, 1) = 0;
+	mazeImage(start->posX, start->posY, 0, 2) = 255;
 
 	// Save the image
 	mazeImage.save_bmp(solutionName.c_str());
@@ -248,12 +384,17 @@ void Maze::depthFirstSearch()
 		}
 	}
 
-	// Calculate pathLength for color interpolation later
-	while(v != NULL)
+	// Calculate # of pixels to color
+	Node *t = end;
+	while (t->parent != NULL)
 	{
-		v = v->parent;
-		pathLength++;
+		pathPixelLength += abs(t->posX - t->parent->posX);
+		pathPixelLength += abs(t->posY - t->parent->posY);
+		t = t->parent;
+		pathNodeLength++;
 	}
+	pathPixelLength++;				// the start node is not covered above. Add it here
+	pathNodeLength++;
 	
 	auto endClock = Clock::now();
 	isOperationComplete = true;
