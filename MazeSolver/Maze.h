@@ -1,11 +1,13 @@
 // Zachary Schmalz
-// June 6, 2017
+// December 9, 2017
 // Maze.h
 
 #pragma once
 
 #include <string>
 #include <vector>
+#include <chrono>
+#include <future>
 #include "CImg.h"
 
 using namespace cimg_library;
@@ -24,14 +26,14 @@ class Maze
 		// Public class members
 
 		// Public class functions
-		Maze(std::string image);								// class constructor
-		void solve(int algorithm, std::string solutionName);	// function that solves the maze using a user-specified algorithm
+		Maze();													// class constructor
+		bool initialize(std::string image);						// initializes the maze, creating data etc.
+		void solve(int algorithm);								// function that solves the maze using a user-specified algorithm
 
 	private:
 		// Private class members
-		CImg<unsigned char> mazeImage;							// CImg object that contains the input image
+		CImg<int> mazeImage;									// CImg object that contains the input image
 		std::vector< std::vector<Node*> > mazeVector;			// 2D node vector that contains all nodes
-		std::vector< std::vector<bool> > visited;				// 2D boolean vector that tracks which nodes have been visited by a searching algorithm
 		Node *start;											// start node
 		Node *end;												// end node
 		int nodeCount;											// total # of nodes created in the maze
@@ -45,11 +47,11 @@ class Maze
 		bool isOperationComplete;								// signals if an executing operation is complete
 
 		// Private class functions
-		void imageLoad(std::string image);						// function that takes the name of input image as string param and loads the CImg object into memory
-		void allocateNodes();									// function that allocates memory for node structures
-		void assignNodeData();									// function that assigns the node structure fields
+		void imageLoad(std::string image, std::promise<bool> && p);// function that takes the name of input image as string param and loads the CImg object into memory
+		void createMaze();										// function that allocates memory for node structures and assigns their data
 		void imageSave(std::string solutionName);				// function that saves modified version of roginal maze with solution
 		void computing(std::string message);					// function that displays currently executing operation
 		void depthFirstSearch();								// function that solves the maze using DFS algorithm	
-
+		void breadthFirstSearch();								// function that solves the maze using BFS algorithm
+		void endOperation(std::chrono::time_point<std::chrono::steady_clock> startClock);	// function to trigger the end of an opeartion
 };

@@ -1,5 +1,5 @@
 // Zachary Schmalz
-// June 7, 2017
+// December 9, 2017
 // Main.cpp
 
 #include <iostream>
@@ -10,26 +10,67 @@ using namespace std;
 // Main method
 int main()
 {
-	cout << "Schmalz Maze Solver v1.1.0 (x64)" << endl;
+	cimg::exception_mode(0);
+
+	cout << "Schmalz Maze Solver v1.2.0 (x64)" << endl;
 	cout << "Zachary Schmalz" << endl;
-	cout << "June 17, 2017\n" << endl;
+	cout << "December 9, 2017\n" << endl;
 
-	int searchAlgorithm = 0;
+	// Create the maze object
+	Maze maze;
+
 	string fileName = "";
-	string solutionName = "";
-
-	cout << "Enter maze file name (*.bmp format only):" << endl;
+	cout << "Enter maze file name (.bmp or .png):" << endl;
 	cin >> fileName;
-	cout << "\nSelect search algorithm:" << endl;
-	cout << "    (1). Depth First Seach" << endl;
-	cin >> searchAlgorithm;
-	cout << "\nEnter solution file name (*.bmp format only):" << endl;
-	cin >> solutionName;
 
-	cout << "\n\n\nSolving \"" << fileName << "\"" << endl << endl;
+	// Check for File errors
+	bool success = false;
+	while (!success)
+	{
+		// File is not a BMP or PNG image
+		if (fileName.find(".png") == string::npos && fileName.find(".bmp") == string::npos)
+		{
+			cout << "ERROR: Invalid File Extension\n" << endl;
+			cin.clear();
+			cin.ignore(cin.rdbuf()->in_avail());
+			cin >> fileName;
+		}
 
-	Maze maze(fileName);
-	maze.solve(searchAlgorithm, solutionName);
-	
-	system("pause");
+		// Check that the file exists
+		else
+		{
+			cout << endl;
+
+			// The result of initializing the maze (returns false if file does not exist)
+			success = maze.initialize(fileName);
+
+			// File does not exist
+			if(!success)
+			{
+				cout << "\nERROR: File Not Found\n\n";
+				cin.clear();
+				cin.ignore(cin.rdbuf()->in_avail());
+				cin >> fileName;
+			}
+		}
+	}
+
+	int option = 0;
+	while (true)
+	{
+		cout << "\nSelect option:" << endl;
+		cout << "    (1). Depth First Seach" << endl;
+		cout << "    (2). Breadth First Seach" << endl;
+		cout << "    (3). Quit" << endl;
+
+		cin.clear();
+		cin.ignore(cin.rdbuf()->in_avail());
+		cin >> option;
+
+		if (option == 1 || option == 2)
+			maze.solve(option);
+
+		else if (option == 3)
+			return 0;
+	}
 }
