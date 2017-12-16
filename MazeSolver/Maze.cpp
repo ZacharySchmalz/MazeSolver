@@ -1,5 +1,5 @@
 // Zachary Schmalz
-// December 9, 2017
+// December 15, 2017
 // Maze.cpp
 
 #include <iostream>		// standard I/O
@@ -9,6 +9,8 @@
 #include <queue>		// used in breadth first search algorithm
 #include <cmath>		// math functions
 #include "Maze.h"		// function declarations
+
+#define FLOOR 255		// White pixels are the floor, black pixels are the walls
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -21,13 +23,13 @@ Maze::Maze()
 // Initialize the maze
 bool Maze::initialize(std::string image)
 {
-	// Load the image
 	isOperationComplete = false;
 
-	// Retrieve result of imageLoad function
+	// Store result of imageLoad function
 	std::promise<bool> result;
 	auto operation = result.get_future();
 
+	// Attempt to load image
 	std::thread info_t1(&Maze::computing, this, "Loading Image");
 	std::thread operation_t1(&Maze::imageLoad, this, image, std::move(result));
 	info_t1.join();
@@ -38,6 +40,7 @@ bool Maze::initialize(std::string image)
 		return false;
 
 	std::cout << "\nImage Loaded\t\t\t" << std::setprecision(9) << time << " seconds\n" << std::endl;
+	inputName = image;
 
 	// Create the maze
 	std::cout << "Creating Maze." << std::endl;
@@ -113,6 +116,18 @@ void Maze::solve(int algorithm)
 	}
 }
 
+// This operation clears node data and image data from memory so that another image can be loaded
+void Maze::clear()
+{
+	isOperationComplete = false;
+	std::cout << std::endl;
+	std::thread info_t1(&Maze::computing, this, "Clearing up memory");
+	std::thread operation_t1(&Maze::deallocate, this);
+	info_t1.join();
+	operation_t1.join();
+	std::cout << "\nMemory Deallocated\n" << std::endl;
+}
+
 // Function that loads the maze image into memory
 void Maze::imageLoad(std::string image, std::promise<bool> && p)
 {
@@ -135,7 +150,7 @@ void Maze::createMaze()
 	// Manually allocate Start node.
 	for (int i = 0; i < mazeVector[0].size(); i++)
 	{
-		if (mazeImage(i, 0, 0, 0) == 255)
+		if (mazeImage(i, 0, 0, 0) == FLOOR)
 		{
 			mazeVector[0][i] = new Node;
 			mazeVector[0][i]->posX = i;
@@ -149,7 +164,7 @@ void Maze::createMaze()
 	// Manually allocate End node
 	for (int i = 0; i < mazeVector[height - 1].size(); i++)
 	{
-		if (mazeImage(i, height - 1, 0, 0) == 255)
+		if (mazeImage(i, height - 1, 0, 0) == FLOOR)
 		{
 			mazeVector[height - 1][i] = new Node;
 			mazeVector[height-1][i]->posX = i;
@@ -167,31 +182,31 @@ void Maze::createMaze()
 	{
 		for (int x = 0; x < mazeVector[y].size(); x++)
 		{
-			if (mazeImage(x, y, 0, 0) == 255)
+			if (mazeImage(x, y, 0, 0) == FLOOR)
 			{
 				int directions = 0;
 				bool north = false, east = false, south = false, west = false;
 
 				// Check north
-				if (y-1 >= 0 && mazeImage(x, y - 1, 0, 0) == 255)
+				if (y-1 >= 0 && mazeImage(x, y - 1, 0, 0) == FLOOR)
 				{
 					directions++;
 					north = true;
 				}
 				// Check east
-				if (x+1 < width && mazeImage(x + 1, y, 0, 0) == 255)
+				if (x+1 < width && mazeImage(x + 1, y, 0, 0) == FLOOR)
 				{
 					directions++;
 					east = true;
 				}
 				// Check south
-				if (y+1 <= height && mazeImage(x, y + 1, 0, 0) == 255)
+				if (y+1 <= height && mazeImage(x, y + 1, 0, 0) == FLOOR)
 				{
 					directions++;
 					south = true;
 				}
 				// Check west
-				if (x-1 > 0 && mazeImage(x - 1, y, 0, 0) == 255)
+				if (x-1 > 0 && mazeImage(x - 1, y, 0, 0) == FLOOR)
 				{
 					directions++;
 					west = true;
@@ -224,12 +239,12 @@ void Maze::createMaze()
 					nodeCount++;
 				}
 
-				// If node was created, link to previous nodes that have been assigned.
+				// If a node was created, link to previous nodes that have been assigned.
 				if (mazeVector[y][x])
 				{
 					// Check for nodes north of current node
 					int range = y - 1;
-					while (range >= 0 && mazeImage(x, range, 0, 0) == 255)
+					while (range >= 0 && mazeImage(x, range, 0, 0) == FLOOR)
 					{
 						if (mazeVector[range][x] != NULL)
 						{
@@ -243,7 +258,7 @@ void Maze::createMaze()
 
 					// Check west pixels for a path
 					range = x - 1;
-					while (range > 0 && mazeImage(range, y, 0, 0) == 255)
+					while (range > 0 && mazeImage(range, y, 0, 0) == FLOOR)
 					{
 						if (mazeVector[y][range] != NULL)
 						{
@@ -261,7 +276,7 @@ void Maze::createMaze()
 	
 	// Manually assign neighbors for end node since the above loop does not visit the end node to assign the neighbors
 	int range = end->posY - 1;
-	while (range >= 0 && mazeImage(end->posX, range, 0, 0) == 255)
+	while (range >= 0 && mazeImage(end->posX, range, 0, 0) == FLOOR)
 	{
 		if (mazeVector[range][end->posX] != NULL)
 		{
@@ -275,10 +290,127 @@ void Maze::createMaze()
 	endOperation(startClock);
 }
 
+// Stack implementation of Depth First Search algorithm
+void Maze::depthFirstSearch()
+{
+	auto startClock = Clock::now();
+
+	std::vector< std::vector<bool> > visited(height, std::vector<bool>(width, 0));
+	std::stack<Node*> stack;										// Initialize stack
+	Node *v = NULL;
+
+	stack.push(start);												// Push start node onto stack
+	while (!stack.empty())
+	{
+		v = stack.top();
+		stack.pop();												// Pop off of stack
+		visited[v->posY][v->posX] = true;							// Mark the node visited
+		nodesVisited++;
+
+		if (v == end)												// End node reached, break out of loop
+		{
+			Node *t = end;
+			while (t->parent != NULL)
+			{
+				pathPixelLength += abs(t->posX - t->parent->posX);
+				pathPixelLength += abs(t->posY - t->parent->posY);
+				pathNodeLength++;
+				t = t->parent;
+			}
+			pathPixelLength += abs(t->posX - start->posX);
+			pathPixelLength += abs(t->posY - start->posY);
+			pathNodeLength++;
+			break;
+		}
+
+		for (int i = 0; i < v->neighbors.size(); i++)				// Iterate through the node's neighbors
+		{
+			Node *t = v->neighbors[i];
+			if (!visited[t->posY][t->posX])							// If the neighbor hasnt been visited, add node to the stack
+			{
+				t->parent = v;										// Assign the neighbors parent (the node the neighbor was reached from)
+				stack.push(t);
+			}
+		}
+	}
+	
+	endOperation(startClock);
+}
+
+// Breadth First Search Implementation algorithm
+void Maze::breadthFirstSearch()
+{
+	auto startClock = Clock::now();
+
+	std::vector< std::vector<bool> > visited(height, std::vector<bool>(width, 0));
+	std::queue<Node*> queue;
+
+	queue.push(start);
+	visited[start->posY][start->posX] = true;
+	nodesVisited++;
+
+	while (!queue.empty())
+	{
+		Node *s = queue.front();
+		queue.pop();
+
+		// End node reached
+		if (s == end)
+		{
+			Node *t = end;
+			while (t->parent != NULL)
+			{
+				pathPixelLength += abs(t->posX - t->parent->posX);
+				pathPixelLength += abs(t->posY - t->parent->posY);
+				pathNodeLength++;
+				t = t->parent;
+			}
+			pathPixelLength += abs(t->posX - start->posX);
+			pathPixelLength += abs(t->posY - start->posY);
+			pathNodeLength++;
+			break;
+		}
+
+		for each (Node* n in s->neighbors)
+		{
+			if (!visited[n->posY][n->posX])
+			{
+				visited[n->posY][n->posX] = true;
+				nodesVisited++;
+				n->parent = s;
+				queue.push(n);
+			}
+		}
+	}
+
+	endOperation(startClock);
+}
+
+// Delete the allocated nodes and image
+void Maze::deallocate()
+{
+	auto startClock = Clock::now();
+
+	for (int i = 0; i < mazeVector.size(); i++)
+	{
+		for (int j = 0; j < mazeVector[i].size(); j++)
+		{
+			delete mazeVector[i][j];
+		}
+		mazeVector[i].clear();
+	}
+	mazeVector.clear();
+	mazeImage.clear();
+
+	endOperation(startClock);
+}
+
 // Color the path through the maze and save it
 void Maze::imageSave(std::string solutionName)
 {
 	auto startClock = Clock::now();
+
+	CImg<int> mazeTemp = mazeImage;
 
 	// Interpolate the path color from blue to red
 	int r = 0;
@@ -286,7 +418,7 @@ void Maze::imageSave(std::string solutionName)
 	Node *t = end;
 
 	// Trace path backwards from the end
-	while(t->parent != NULL)
+	while (t->parent != NULL)
 	{
 		// Parent node lies on the X axis of mazeVector
 		if (t->posX - t->parent->posX != 0)
@@ -298,9 +430,9 @@ void Maze::imageSave(std::string solutionName)
 				for (int j = 0; j < xDif; j++)
 				{
 					r = int((i * 255) / pathPixelLength);
-					mazeImage(t->posX-j, t->posY, 0, 0) = 255 - r;
-					mazeImage(t->posX-j, t->posY, 0, 1) = 0;
-					mazeImage(t->posX-j, t->posY, 0, 2) = r;
+					mazeTemp(t->posX - j, t->posY, 0, 0) = 255 - r;
+					mazeTemp(t->posX - j, t->posY, 0, 1) = 0;
+					mazeTemp(t->posX - j, t->posY, 0, 2) = r;
 					i++;
 				}
 			}
@@ -310,9 +442,9 @@ void Maze::imageSave(std::string solutionName)
 				for (int j = 0; j < abs(xDif); j++)
 				{
 					r = int((i * 255) / pathPixelLength);
-					mazeImage(t->posX+j, t->posY, 0, 0) = 255 - r;
-					mazeImage(t->posX+j, t->posY, 0, 1) = 0;
-					mazeImage(t->posX+j, t->posY, 0, 2) = r;
+					mazeTemp(t->posX + j, t->posY, 0, 0) = 255 - r;
+					mazeTemp(t->posX + j, t->posY, 0, 1) = 0;
+					mazeTemp(t->posX + j, t->posY, 0, 2) = r;
 					i++;
 				}
 			}
@@ -327,9 +459,9 @@ void Maze::imageSave(std::string solutionName)
 				for (int j = 0; j < yDif; j++)
 				{
 					r = int((i * 255) / pathPixelLength);
-					mazeImage(t->posX, t->posY-j, 0, 0) = 255 - r;
-					mazeImage(t->posX, t->posY-j, 0, 1) = 0;
-					mazeImage(t->posX, t->posY-j, 0, 2) = r;
+					mazeTemp(t->posX, t->posY - j, 0, 0) = 255 - r;
+					mazeTemp(t->posX, t->posY - j, 0, 1) = 0;
+					mazeTemp(t->posX, t->posY - j, 0, 2) = r;
 					i++;
 				}
 			}
@@ -339,9 +471,9 @@ void Maze::imageSave(std::string solutionName)
 				for (int j = 0; j < abs(yDif); j++)
 				{
 					r = int((i * 255) / pathPixelLength);
-					mazeImage(t->posX, t->posY+j, 0, 0) = 255 - r;
-					mazeImage(t->posX, t->posY+j, 0, 1) = 0;
-					mazeImage(t->posX, t->posY+j, 0, 2) = r;
+					mazeTemp(t->posX, t->posY + j, 0, 0) = 255 - r;
+					mazeTemp(t->posX, t->posY + j, 0, 1) = 0;
+					mazeTemp(t->posX, t->posY + j, 0, 2) = r;
 					i++;
 				}
 			}
@@ -350,106 +482,12 @@ void Maze::imageSave(std::string solutionName)
 	}
 
 	// Since start node does not have parent, manually color. Will be solid blue
-	mazeImage(start->posX, start->posY, 0, 0) = 0;
-	mazeImage(start->posX, start->posY, 0, 1) = 0;
-	mazeImage(start->posX, start->posY, 0, 2) = 255;
+	mazeTemp(start->posX, start->posY, 0, 0) = 0;
+	mazeTemp(start->posX, start->posY, 0, 1) = 0;
+	mazeTemp(start->posX, start->posY, 0, 2) = 255;
 
 	// Save the image
-	mazeImage.save(solutionName.c_str());
-
-	endOperation(startClock);
-}
-
-// Stack implementation of Depth First Search algorithm
-void Maze::depthFirstSearch()
-{
-	auto startClock = Clock::now();
-
-	std::stack<Node*> stack;										// Initialize stack
-	std::vector< std::vector<bool> > visited(height, std::vector<bool>(width, 0));
-
-	stack.push(start);												// Push start node onto stack
-	Node *v = NULL;
-	while (!stack.empty())
-	{
-		v = stack.top();
-		nodesVisited++;
-		stack.pop();												// Pop off of stack
-		visited[v->posY][v->posX] = true;							// Mark the node visited
-		if (v == end)												// End node reached, break out of loop
-		{
-			break;
-		}
-
-		for (int i = 0; i < v->neighbors.size(); i++)				// Iterate through the node's neighbors
-		{
-			Node *t = v->neighbors[i];
-			if (!visited[t->posY][t->posX])							// If the neighbor hasnt been visited, add node to the stack
-			{
-				t->parent = v;										// Assign the neighbors parent (the node the neighbor was reached from)
-				stack.push(t);
-			}
-		}
-	}
-
-	// Calculate # of pixels to color
-	Node *t = end;
-	while (t->parent != NULL)
-	{
-		pathPixelLength += abs(t->posX - t->parent->posX);
-		pathPixelLength += abs(t->posY - t->parent->posY);
-		t = t->parent;
-		pathNodeLength++;
-		
-	}
-	pathPixelLength++;				// the start node is not covered above. Add it here
-	pathNodeLength++;
-	
-	endOperation(startClock);
-}
-
-// Breadth First Search Implementation algorithm
-void Maze::breadthFirstSearch()
-{
-	auto startClock = Clock::now();
-
-	std::queue<Node*> queue;
-	std::vector< std::vector<bool> > visited(height, std::vector<bool>(width, 0));
-
-	visited[start->posY][start->posX] = true;
-	queue.push(start);
-	nodesVisited++;
-
-	while (!queue.empty())
-	{
-		Node *s = queue.front();
-		queue.pop();
-		if (s == end)
-			break;
-
-		for each (Node* n in s->neighbors)
-		{
-			if (!visited[n->posY][n->posX])
-			{
-				visited[n->posY][n->posX] = true;
-				nodesVisited++;
-				n->parent = s;
-				queue.push(n);
-			}
-		}
-	}
-
-	// Calculate # of pixels to color
-	Node *t = end;
-	while (t->parent != NULL)
-	{
-		pathPixelLength += abs(t->posX - t->parent->posX);
-		pathPixelLength += abs(t->posY - t->parent->posY);
-		t = t->parent;
-		pathNodeLength++;
-	}
-	pathPixelLength++;				// the start node is not covered above. Add it here
-	pathNodeLength++;
+	mazeTemp.save_bmp(solutionName.c_str());
 
 	endOperation(startClock);
 }
@@ -484,5 +522,4 @@ void Maze::endOperation(std::chrono::time_point<std::chrono::steady_clock> start
 	isOperationComplete = true;
 	auto endClock = Clock::now();
 	time = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(endClock - startClock).count() / 1000000000;
-	totalTime += time;
 }

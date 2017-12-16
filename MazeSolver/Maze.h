@@ -1,5 +1,5 @@
 // Zachary Schmalz
-// December 9, 2017
+// December 15, 2017
 // Maze.h
 
 #pragma once
@@ -24,11 +24,13 @@ class Maze
 {
 	public:
 		// Public class members
+		std::string inputName;									// Name of the input file of the maze
 
 		// Public class functions
 		Maze();													// class constructor
 		bool initialize(std::string image);						// initializes the maze, creating data etc.
 		void solve(int algorithm);								// function that solves the maze using a user-specified algorithm
+		void clear();											// deallocates the nodes created in preparation to load another image
 
 	private:
 		// Private class members
@@ -43,15 +45,15 @@ class Maze
 		int width;												// image height(pixels)
 		int height;												// image width(pixels)
 		double time;											// timing the lengths of operations
-		double totalTime;										// timing of all operations
 		bool isOperationComplete;								// signals if an executing operation is complete
 
 		// Private class functions
 		void imageLoad(std::string image, std::promise<bool> && p);// function that takes the name of input image as string param and loads the CImg object into memory
 		void createMaze();										// function that allocates memory for node structures and assigns their data
+		void depthFirstSearch();								// function that solves the maze using DFS algorithm
+		void breadthFirstSearch();								// function that solves the maze using BFS algorithm
+		void deallocate();										// function that clears node and image data from memory
 		void imageSave(std::string solutionName);				// function that saves modified version of roginal maze with solution
 		void computing(std::string message);					// function that displays currently executing operation
-		void depthFirstSearch();								// function that solves the maze using DFS algorithm	
-		void breadthFirstSearch();								// function that solves the maze using BFS algorithm
 		void endOperation(std::chrono::time_point<std::chrono::steady_clock> startClock);	// function to trigger the end of an opeartion
 };
